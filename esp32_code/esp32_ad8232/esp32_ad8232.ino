@@ -13,6 +13,7 @@ const char* serverUrl = "https://chagas-disease-backent.onrender.com/api/ecg-raw
 #define LO_MINUS 33
 
 #define BUFFER_SIZE 200
+#define MAX_RETRIES 3
 
 int ecgBuffer[BUFFER_SIZE];
 
@@ -31,6 +32,37 @@ void setup() {
   Serial.println("\nWiFi Connected");
 }
 
+bool postECG() {
+  WiFiClientSecure client;
+  client.setInsecure();
+  HTTPClient http;
+  http.begin(client, serverUrl);
+  http.setTimeout(60000);
+  http.addHeader("Content-Type", "application/json");
+
+  StaticJsonDocument<3000> doc;
+  JsonArray samples = doc.createNestedArray("samples");
+  for (int i = 0; i < BUFFER_SIZE; i++) {
+    samples.add(ecgBuffer[i]);
+  }
+
+  String requestBody;
+  serializeJson(doc, requestBody);
+
+  int httpResponseCode = http.POST(requestBody);
+  http.end();
+
+  if (httpResponseCode > 0) {
+    Serial.print("HTTP Status: ");
+    Serial.println(httpResponseCode);
+    return true;
+  } else {
+    Serial.print("Error: ");
+    Serial.println(http.errorToString(httpResponseCode).c_str());
+    return false;
+  }
+}
+
 void loop() {
   if (digitalRead(LO_PLUS) == 1 || digitalRead(LO_MINUS) == 1) {
     Serial.println("Leads off! Check electrodes.");
@@ -38,43 +70,26 @@ void loop() {
     return;
   }
 
-  // Collect 200 samples at ~250Hz (4ms per sample)
   for (int i = 0; i < BUFFER_SIZE; i++) {
     ecgBuffer[i] = analogRead(ECG_PIN);
     delay(4);
   }
 
   if (WiFi.status() == WL_CONNECTED) {
-    WiFiClientSecure client;
-    client.setInsecure(); // Skip certificate validation for Render HTTPS
-    HTTPClient http;
-    http.begin(client, serverUrl);
-    http.setTimeout(15000);
-    http.addHeader("Content-Type", "application/json");
-
-    StaticJsonDocument<3000> doc;
-    JsonArray samples = doc.createNestedArray("samples");
-    for (int i = 0; i < BUFFER_SIZE; i++) {
-      samples.add(ecgBuffer[i]);
+    bool success = false;
+    for (int attempt = 1; attempt <= MAX_RETRIES && !success; attempt++) {
+      if (attempt > 1) {
+        Serial.printf("Retry %d/%d - waiting 10s for server to wake...\n", attempt, MAX_RETRIES);
+        delay(10000);
+      }
+      success = postECG();
     }
-
-    String requestBody;
-    serializeJson(doc, requestBody);
-
-    int httpResponseCode = http.POST(requestBody);
-
-    if (httpResponseCode > 0) {
-      Serial.print("HTTP Status: ");
-      Serial.println(httpResponseCode);
-      Serial.println(http.getString());
-    } else {
-      Serial.print("Error: ");
-      Serial.println(http.errorToString(httpResponseCode).c_str());
+    if (!success) {
+      Serial.println("All retries failed.");
     }
-
-    http.end();
   } else {
     Serial.println("WiFi Disconnected");
+    WiFi.reconnect();
   }
 
   delay(100);
