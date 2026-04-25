@@ -78,7 +78,7 @@ app.post('/api/ecg-raw', async (req, res) => {
 function runECGProcessing(ecgArray) {
   return new Promise((resolve, reject) => {
     // Note: Use 'python' or 'python3' depending on your Windows setup
-    const py = spawn('python', [path.join(__dirname, 'ml', 'ecg_processor.py')]);
+    const py = spawn('python3', [path.join(__dirname, 'ml', 'ecg_processor.py')]);
 
     let result = '';
 
