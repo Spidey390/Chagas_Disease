@@ -81,6 +81,7 @@ function runECGProcessing(ecgArray) {
     const py = spawn('python3', [path.join(__dirname, 'ml', 'ecg_processor.py')]);
 
     let result = '';
+    let stderrOutput = '';
 
     py.stdin.write(JSON.stringify(ecgArray));
     py.stdin.end();
@@ -90,12 +91,14 @@ function runECGProcessing(ecgArray) {
     });
 
     py.stderr.on('data', (err) => {
-      console.error('Python error:', err.toString());
+      stderrOutput += err.toString();
+      console.error('Python stderr:', err.toString());
     });
 
     py.on('close', (code) => {
       if (code !== 0) {
-         return reject(new Error(`Python script exited with code ${code}`));
+        const msg = stderrOutput.trim() || `Python script exited with code ${code}`;
+        return reject(new Error(`Python error: ${msg}`));
       }
       try {
         resolve(JSON.parse(result));
