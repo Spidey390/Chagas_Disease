@@ -24,7 +24,7 @@ function App() {
     setLoading(true);
     try {
       // Send data to backend for analysis
-      const response = await axios.post('http://localhost:5000/api/analyze', formData);
+      const response = await axios.post('https://chagas-disease-backent.onrender.com/api/analyze', formData);
       setResults(response.data.result);
     } catch (error) {
       console.error('Error analyzing data:', error);
