@@ -1,11 +1,12 @@
 #include <WiFi.h>
 #include <HTTPClient.h>
+#include <WiFiClientSecure.h>
 #include <ArduinoJson.h>
 
 #define WIFISSID "QWERTY"
 #define PASSWORD "1234567890"
 
-const char* serverUrl = "http://192.168.1.12:5000/api/ecg-raw";
+const char* serverUrl = "https://chagas-disease-backent.onrender.com/api/ecg-raw";
 
 #define ECG_PIN 34
 #define LO_PLUS 32
@@ -44,8 +45,10 @@ void loop() {
   }
 
   if (WiFi.status() == WL_CONNECTED) {
+    WiFiClientSecure client;
+    client.setInsecure(); // Skip certificate validation for Render HTTPS
     HTTPClient http;
-    http.begin(serverUrl);
+    http.begin(client, serverUrl);
     http.setTimeout(15000);
     http.addHeader("Content-Type", "application/json");
 
